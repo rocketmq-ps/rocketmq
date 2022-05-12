@@ -18,11 +18,7 @@ package org.apache.rocketmq.broker;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -83,17 +79,29 @@ import org.apache.rocketmq.common.DataVersion;
 import org.apache.rocketmq.common.ThreadFactoryImpl;
 import org.apache.rocketmq.common.TopicConfig;
 import org.apache.rocketmq.common.UtilAll;
+import org.apache.rocketmq.common.admin.TopicOffset;
+import org.apache.rocketmq.common.admin.TopicStatsTable;
 import org.apache.rocketmq.common.constant.LoggerName;
 import org.apache.rocketmq.common.constant.PermName;
+import org.apache.rocketmq.common.exporter.ExporterConfig;
+import org.apache.rocketmq.common.message.MessageQueue;
 import org.apache.rocketmq.common.namesrv.RegisterBrokerResult;
 import org.apache.rocketmq.common.protocol.RequestCode;
+import org.apache.rocketmq.common.protocol.ResponseCode;
+import org.apache.rocketmq.common.protocol.body.ClusterInfo;
 import org.apache.rocketmq.common.protocol.body.TopicConfigSerializeWrapper;
+import org.apache.rocketmq.common.protocol.body.TopicList;
+import org.apache.rocketmq.common.protocol.header.GetTopicStatsInfoRequestHeader;
+import org.apache.rocketmq.common.protocol.route.BrokerData;
 import org.apache.rocketmq.common.stats.MomentStatsItem;
+import org.apache.rocketmq.exporter.ExporterController;
+import org.apache.rocketmq.exporter.hook.RemotingMetricHook;
 import org.apache.rocketmq.logging.InternalLogger;
 import org.apache.rocketmq.logging.InternalLoggerFactory;
 import org.apache.rocketmq.remoting.RPCHook;
 import org.apache.rocketmq.remoting.RemotingServer;
 import org.apache.rocketmq.remoting.common.TlsMode;
+import org.apache.rocketmq.remoting.exception.RemotingCommandException;
 import org.apache.rocketmq.remoting.netty.NettyClientConfig;
 import org.apache.rocketmq.remoting.netty.NettyRemotingServer;
 import org.apache.rocketmq.remoting.netty.NettyRequestProcessor;
@@ -120,6 +128,7 @@ public class BrokerController {
     private final NettyServerConfig nettyServerConfig;
     private final NettyClientConfig nettyClientConfig;
     private final MessageStoreConfig messageStoreConfig;
+    private final ExporterConfig exporterConfig;
     private final ConsumerOffsetManager consumerOffsetManager;
     private final ConsumerManager consumerManager;
     private final ConsumerFilterManager consumerFilterManager;
@@ -134,7 +143,8 @@ public class BrokerController {
     private final RebalanceLockManager rebalanceLockManager = new RebalanceLockManager();
     private final BrokerOuterAPI brokerOuterAPI;
     private final ScheduledExecutorService scheduledExecutorService = Executors.newSingleThreadScheduledExecutor(new ThreadFactoryImpl(
-        "BrokerControllerScheduledThread"));
+            "BrokerControllerScheduledThread"));
+    private final List<ScheduledExecutorService> metricsExcutorServices;
     private final SlaveSynchronize slaveSynchronize;
     private final BlockingQueue<Runnable> sendThreadPoolQueue;
     private final BlockingQueue<Runnable> putThreadPoolQueue;
@@ -173,18 +183,21 @@ public class BrokerController {
     private TransactionalMessageService transactionalMessageService;
     private AbstractTransactionalMessageCheckListener transactionalMessageCheckListener;
     private Future<?> slaveSyncFuture;
-    private Map<Class,AccessValidator> accessValidatorMap = new HashMap<Class, AccessValidator>();
+    private Map<Class, AccessValidator> accessValidatorMap = new HashMap<Class, AccessValidator>();
+    private ExporterController exporterController;
 
     public BrokerController(
         final BrokerConfig brokerConfig,
         final NettyServerConfig nettyServerConfig,
         final NettyClientConfig nettyClientConfig,
-        final MessageStoreConfig messageStoreConfig
+        final MessageStoreConfig messageStoreConfig,
+        final ExporterConfig exporterConfig
     ) {
         this.brokerConfig = brokerConfig;
         this.nettyServerConfig = nettyServerConfig;
         this.nettyClientConfig = nettyClientConfig;
         this.messageStoreConfig = messageStoreConfig;
+        this.exporterConfig = exporterConfig;
         this.consumerOffsetManager = messageStoreConfig.isEnableLmq() ? new LmqConsumerOffsetManager(this) : new ConsumerOffsetManager(this);
         this.topicConfigManager = messageStoreConfig.isEnableLmq() ? new LmqTopicConfigManager(this) : new TopicConfigManager(this);
         this.pullMessageProcessor = new PullMessageProcessor(this);
@@ -222,6 +235,9 @@ public class BrokerController {
             BrokerPathConfigHelper.getBrokerConfigPath(),
             this.brokerConfig, this.nettyServerConfig, this.nettyClientConfig, this.messageStoreConfig
         );
+
+        this.exporterController = new ExporterController(exporterConfig, false, log);
+        this.metricsExcutorServices = new ArrayList<>();
     }
 
     public BrokerConfig getBrokerConfig() {
@@ -240,7 +256,7 @@ public class BrokerController {
         return queryThreadPoolQueue;
     }
 
-    public boolean initialize() throws CloneNotSupportedException {
+    public boolean initialize() throws CloneNotSupportedException, IOException {
         boolean result = this.topicConfigManager.load();
 
         result = result && this.consumerOffsetManager.load();
@@ -473,8 +489,18 @@ public class BrokerController {
             initialTransaction();
             initialAcl();
             initialRpcHooks();
+
+            this.registerMetricHook();
         }
         return result;
+    }
+
+    private void registerMetricHook() throws IOException {
+        RemotingMetricHook metricHook = new RemotingMetricHook(this.exporterController, this.getNettyServerConfig());
+        this.remotingServer.registerRPCHook(metricHook);
+        this.fastRemotingServer.registerRPCHook(metricHook);
+
+        this.exporterController.initialize();
     }
 
     private void initialTransaction() {
@@ -613,6 +639,116 @@ public class BrokerController {
         AdminBrokerProcessor adminProcessor = new AdminBrokerProcessor(this);
         this.remotingServer.registerDefaultProcessor(adminProcessor, this.adminBrokerExecutor);
         this.fastRemotingServer.registerDefaultProcessor(adminProcessor, this.adminBrokerExecutor);
+
+        this.initMetricCollecting(adminProcessor);
+    }
+
+    private void initMetricCollecting(AdminBrokerProcessor adminProcessor) {
+        String metricThreadPrefix = "BrokerMetric_";
+
+        // init topic metrics
+        {
+            ScheduledExecutorService s1 = Executors.newSingleThreadScheduledExecutor(new ThreadFactoryImpl(metricThreadPrefix + "Topic"));
+            GetTopicStatsInfoRequestHeader requestHeader = new GetTopicStatsInfoRequestHeader();
+
+            s1.scheduleAtFixedRate(new Runnable() {
+                @Override
+                public void run() {
+                    ClusterInfo clusterInfo = null;
+                    try {
+                        clusterInfo = brokerOuterAPI.getBrokerClusterInfo(10000L);
+                    } catch (Exception ex) {
+                        log.error("getBrokerClusterInfo error", ex);
+                    }
+                    if (clusterInfo == null) {
+                        return;
+                    }
+
+                    TopicList topicList = null;
+                    try {
+                        topicList = brokerOuterAPI.getTopicListFromNameServer(10000L);
+                    } catch (Exception ex) {
+                        log.error("getTopicListFromNameServer error", ex);
+                    }
+                    if (topicList == null || topicList.getTopicList() == null) {
+                        log.warn("no any topics for metric collecting");
+                        return;
+                    }
+                    HashMap<String, Long> brokerOffsetMap = new HashMap<>();
+                    HashMap<String, Long> brokerUpdateTimestampMap = new HashMap<>();
+
+                    for (String topic : topicList.getTopicList()) {
+                        brokerOffsetMap.clear();
+                        brokerUpdateTimestampMap.clear();
+
+                        requestHeader.setTopic(topic);
+                        RemotingCommand request = RemotingCommand.createRequestCommand(RequestCode.GET_TOPIC_STATS_INFO, requestHeader);
+                        try {
+                            RemotingCommand response = adminProcessor.processRequest(null, request);
+                            // end for success
+                            // end for switch
+                            if (response.getCode() == ResponseCode.SUCCESS) {
+                                TopicStatsTable topicStatsTable = TopicStatsTable.decode(response.getBody(), TopicStatsTable.class);
+                                for (Map.Entry<MessageQueue, TopicOffset> topicStatusEntry : topicStatsTable.getOffsetTable().entrySet()) {
+                                    MessageQueue q = topicStatusEntry.getKey();
+                                    TopicOffset offset = topicStatusEntry.getValue();
+
+                                    if (brokerOffsetMap.containsKey(q.getBrokerName())) {
+                                        brokerOffsetMap.put(q.getBrokerName(), brokerOffsetMap.get(q.getBrokerName()) + offset.getMaxOffset()); // sum(all broker offset)
+                                    } else {
+                                        brokerOffsetMap.put(q.getBrokerName(), offset.getMaxOffset());
+                                    }
+                                    if (brokerUpdateTimestampMap.containsKey(q.getBrokerName())) {
+                                        if (offset.getLastUpdateTimestamp() > brokerUpdateTimestampMap.get(q.getBrokerName())) {
+                                            brokerUpdateTimestampMap.put(q.getBrokerName(), offset.getLastUpdateTimestamp());
+                                        }
+                                    } else {
+                                        brokerUpdateTimestampMap.put(q.getBrokerName(), offset.getLastUpdateTimestamp());
+                                    }
+                                }// end for
+                                Set<Map.Entry<String, Long>> brokerOffsetEntries = brokerOffsetMap.entrySet();
+                                for (Map.Entry<String, Long> brokerOffsetEntry : brokerOffsetEntries) {
+                                    if (!clusterInfo.getBrokerAddrTable().containsKey(brokerOffsetEntry.getKey())) {
+                                        log.error("there is no broker data (%s) in namesrv cluster info %s but should be", brokerOffsetEntry.getKey(), clusterInfo.toJson());
+                                        continue;
+                                    }
+                                    BrokerData bd = clusterInfo.getBrokerAddrTable().get(brokerOffsetEntry.getKey());
+                                    if (bd == null) {
+                                        log.error("broker data (%s) is null in namesrv cluster info %s but should not be", brokerOffsetEntry.getKey(), clusterInfo.toJson());
+                                        continue;
+                                    }
+                                    exporterController.getBrokerCollector().addTopicOffsetMetric(
+                                            bd.getCluster(),
+                                            brokerOffsetEntry.getKey(),
+                                            topic,
+                                            brokerUpdateTimestampMap.get(brokerOffsetEntry.getKey()),
+                                            brokerOffsetEntry.getValue()
+                                    );
+                                }
+                            } else {
+                                log.error("GET_TOPIC_STATS_INFO error %s", response.toString());
+                            }
+                        } catch (RemotingCommandException ex) {
+                            log.error("GET_TOPIC_STATS_INFO error", ex);
+                        }
+                    }// end for topic
+                }
+            }, 1000 * 10, 3000, TimeUnit.MILLISECONDS);
+            metricsExcutorServices.add(s1);
+        }//end init topic metrics
+        // init producer metrics
+        {
+
+        }// end init producer metrics
+
+        // init consumer metrics
+        {
+
+        }// end init consumer metrics
+        // init broker metrics
+        {
+
+        }// end init broker metrics
     }
 
     public BrokerStats getBrokerStats() {
@@ -733,6 +869,14 @@ public class BrokerController {
     }
 
     public void shutdown() {
+        if (this.exporterController != null) {
+            this.exporterController.shutdown();
+        }
+        if (!metricsExcutorServices.isEmpty()) {
+            for(ScheduledExecutorService s : metricsExcutorServices){
+                s.shutdown();
+            }
+        }
         if (this.brokerStatsManager != null) {
             this.brokerStatsManager.shutdown();
         }

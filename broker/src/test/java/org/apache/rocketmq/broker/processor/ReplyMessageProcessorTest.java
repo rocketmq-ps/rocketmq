@@ -26,6 +26,7 @@ import org.apache.rocketmq.broker.BrokerController;
 import org.apache.rocketmq.broker.client.ClientChannelInfo;
 import org.apache.rocketmq.broker.client.net.Broker2Client;
 import org.apache.rocketmq.common.BrokerConfig;
+import org.apache.rocketmq.common.exporter.ExporterConfig;
 import org.apache.rocketmq.common.message.MessageConst;
 import org.apache.rocketmq.common.message.MessageDecoder;
 import org.apache.rocketmq.common.protocol.RequestCode;
@@ -63,7 +64,7 @@ import static org.mockito.Mockito.when;
 public class ReplyMessageProcessorTest {
     private ReplyMessageProcessor replyMessageProcessor;
     @Spy
-    private BrokerController brokerController = new BrokerController(new BrokerConfig(), new NettyServerConfig(), new NettyClientConfig(), new MessageStoreConfig());
+    private BrokerController brokerController = new BrokerController(new BrokerConfig(), new NettyServerConfig(), new NettyClientConfig(), new MessageStoreConfig(), new ExporterConfig());
     @Mock
     private ChannelHandlerContext handlerContext;
     @Mock

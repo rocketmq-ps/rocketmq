@@ -20,6 +20,7 @@ import org.apache.rocketmq.broker.BrokerController;
 import org.apache.rocketmq.client.consumer.PullResult;
 import org.apache.rocketmq.client.consumer.PullStatus;
 import org.apache.rocketmq.common.BrokerConfig;
+import org.apache.rocketmq.common.exporter.ExporterConfig;
 import org.apache.rocketmq.common.message.MessageAccessor;
 import org.apache.rocketmq.common.message.MessageConst;
 import org.apache.rocketmq.common.message.MessageExt;
@@ -63,7 +64,7 @@ public class TransactionalMessageBridgeTest {
 
     @Spy
     private BrokerController brokerController = new BrokerController(new BrokerConfig(), new NettyServerConfig(),
-        new NettyClientConfig(), new MessageStoreConfig());
+        new NettyClientConfig(), new MessageStoreConfig(), new ExporterConfig());
 
     @Mock
     private MessageStore messageStore;

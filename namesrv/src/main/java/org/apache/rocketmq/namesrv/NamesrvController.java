@@ -16,6 +16,7 @@
  */
 package org.apache.rocketmq.namesrv;
 
+import java.io.IOException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -23,6 +24,10 @@ import java.util.concurrent.TimeUnit;
 import org.apache.rocketmq.common.Configuration;
 import org.apache.rocketmq.common.ThreadFactoryImpl;
 import org.apache.rocketmq.common.constant.LoggerName;
+import org.apache.rocketmq.common.exporter.ExporterConfig;
+import org.apache.rocketmq.common.namesrv.NamesrvConfig;
+import org.apache.rocketmq.exporter.ExporterController;
+import org.apache.rocketmq.exporter.hook.RemotingMetricHook;
 import org.apache.rocketmq.logging.InternalLogger;
 import org.apache.rocketmq.logging.InternalLoggerFactory;
 import org.apache.rocketmq.common.namesrv.NamesrvConfig;
@@ -45,6 +50,7 @@ public class NamesrvController {
     private final NamesrvConfig namesrvConfig;
 
     private final NettyServerConfig nettyServerConfig;
+    private ExporterConfig exporterConfig;
 
     private final ScheduledExecutorService scheduledExecutorService = Executors.newSingleThreadScheduledExecutor(new ThreadFactoryImpl(
         "NSScheduledThread"));
@@ -59,10 +65,13 @@ public class NamesrvController {
 
     private Configuration configuration;
     private FileWatchService fileWatchService;
+    private ExporterController exporterController;
 
-    public NamesrvController(NamesrvConfig namesrvConfig, NettyServerConfig nettyServerConfig) {
+
+    public NamesrvController(NamesrvConfig namesrvConfig, NettyServerConfig nettyServerConfig, ExporterConfig exporterConfig) {
         this.namesrvConfig = namesrvConfig;
         this.nettyServerConfig = nettyServerConfig;
+        this.exporterConfig = exporterConfig;
         this.kvConfigManager = new KVConfigManager(this);
         this.routeInfoManager = new RouteInfoManager();
         this.brokerHousekeepingService = new BrokerHousekeepingService(this);
@@ -71,9 +80,10 @@ public class NamesrvController {
             this.namesrvConfig, this.nettyServerConfig
         );
         this.configuration.setStorePathFromConfig(this.namesrvConfig, "configStorePath");
+        this.exporterController = new ExporterController(exporterConfig, true, log);
     }
 
-    public boolean initialize() {
+    public boolean initialize() throws IOException {
 
         this.kvConfigManager.load();
 
@@ -125,8 +135,14 @@ public class NamesrvController {
                 log.warn("FileWatchService created error, can't load the certificate dynamically");
             }
         }
+        this.registerMetricHook();
 
         return true;
+    }
+
+    private void registerMetricHook() throws IOException {
+        this.exporterController.initialize();
+        this.remotingServer.registerRPCHook(new RemotingMetricHook(this.exporterController, this.getNettyServerConfig()));
     }
 
     private void registerProcessor() {
@@ -146,9 +162,12 @@ public class NamesrvController {
         if (this.fileWatchService != null) {
             this.fileWatchService.start();
         }
+
+        this.exporterController.start();
     }
 
     public void shutdown() {
+        this.exporterController.shutdown();
         this.remotingServer.shutdown();
         this.remotingExecutor.shutdown();
         this.scheduledExecutorService.shutdown();

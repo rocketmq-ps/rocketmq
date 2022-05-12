@@ -26,6 +26,7 @@ import org.apache.rocketmq.broker.topic.LmqTopicConfigManager;
 import org.apache.rocketmq.common.BrokerConfig;
 import org.apache.rocketmq.common.TopicConfig;
 import org.apache.rocketmq.common.UtilAll;
+import org.apache.rocketmq.common.exporter.ExporterConfig;
 import org.apache.rocketmq.common.subscription.SubscriptionGroupConfig;
 import org.apache.rocketmq.remoting.netty.NettyClientConfig;
 import org.apache.rocketmq.remoting.netty.NettyServerConfig;
@@ -40,7 +41,7 @@ public class LmqConsumerOffsetManagerTest {
 
     @Spy
     private BrokerController brokerController = new BrokerController(new BrokerConfig(), new NettyServerConfig(),
-        new NettyClientConfig(), new MessageStoreConfig());
+        new NettyClientConfig(), new MessageStoreConfig(), new ExporterConfig());
 
     @Test
     public void testOffsetManage() {

@@ -25,6 +25,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import org.apache.rocketmq.common.TopicConfig;
+import org.apache.rocketmq.common.exporter.ExporterConfig;
 import org.apache.rocketmq.logging.InternalLogger;
 import org.apache.rocketmq.common.namesrv.NamesrvConfig;
 import org.apache.rocketmq.common.namesrv.RegisterBrokerResult;
@@ -69,7 +70,7 @@ public class DefaultRequestProcessorTest {
         nettyServerConfig = new NettyServerConfig();
         routeInfoManager = new RouteInfoManager();
 
-        namesrvController = new NamesrvController(namesrvConfig, nettyServerConfig);
+        namesrvController = new NamesrvController(namesrvConfig, nettyServerConfig, new ExporterConfig());
 
         Field field = NamesrvController.class.getDeclaredField("routeInfoManager");
         field.setAccessible(true);

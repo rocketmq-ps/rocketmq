@@ -16,6 +16,7 @@
  */
 package org.apache.rocketmq.namesrv;
 
+import org.apache.rocketmq.common.exporter.ExporterConfig;
 import org.apache.rocketmq.common.namesrv.NamesrvConfig;
 import org.apache.rocketmq.remoting.netty.NettyServerConfig;
 import org.junit.After;
@@ -31,7 +32,7 @@ public class NameServerInstanceTest {
     @Before
     public void startup() throws Exception {
         nettyServerConfig.setListenPort(9876);
-        nameSrvController = new NamesrvController(namesrvConfig, nettyServerConfig);
+        nameSrvController = new NamesrvController(namesrvConfig, nettyServerConfig, new ExporterConfig());
         boolean initResult = nameSrvController.initialize();
         assertThat(initResult).isTrue();
         nameSrvController.start();

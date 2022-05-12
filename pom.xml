@@ -121,6 +121,7 @@
         <module>logging</module>
         <module>acl</module>
         <module>example</module>
+        <module>exporter</module>
     </modules>
 
     <build>
@@ -516,6 +517,11 @@
             <dependency>
                 <groupId>${project.groupId}</groupId>
                 <artifactId>rocketmq-example</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>${project.groupId}</groupId>
+                <artifactId>rocketmq-exporter</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>

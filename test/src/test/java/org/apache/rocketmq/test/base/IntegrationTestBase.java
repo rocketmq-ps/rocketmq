@@ -26,6 +26,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.rocketmq.broker.BrokerController;
 import org.apache.rocketmq.common.BrokerConfig;
 import org.apache.rocketmq.common.UtilAll;
+import org.apache.rocketmq.common.exporter.ExporterConfig;
 import org.apache.rocketmq.logging.InternalLogger;
 import org.apache.rocketmq.logging.InternalLoggerFactory;
 import org.apache.rocketmq.common.namesrv.NamesrvConfig;
@@ -111,7 +112,7 @@ public class IntegrationTestBase {
         namesrvConfig.setConfigStorePath(baseDir + SEP + "namesrv" + SEP + "namesrv.properties");
 
         nameServerNettyServerConfig.setListenPort(nextPort());
-        NamesrvController namesrvController = new NamesrvController(namesrvConfig, nameServerNettyServerConfig);
+        NamesrvController namesrvController = new NamesrvController(namesrvConfig, nameServerNettyServerConfig, new ExporterConfig());
         try {
             Assert.assertTrue(namesrvController.initialize());
             logger.info("Name Server Start:{}", nameServerNettyServerConfig.getListenPort());
@@ -147,7 +148,7 @@ public class IntegrationTestBase {
         NettyClientConfig nettyClientConfig = new NettyClientConfig();
         nettyServerConfig.setListenPort(nextPort());
         storeConfig.setHaListenPort(nextPort());
-        BrokerController brokerController = new BrokerController(brokerConfig, nettyServerConfig, nettyClientConfig, storeConfig);
+        BrokerController brokerController = new BrokerController(brokerConfig, nettyServerConfig, nettyClientConfig, storeConfig, new ExporterConfig());
         try {
             Assert.assertTrue(brokerController.initialize());
             logger.info("Broker Start name:{} addr:{}", brokerConfig.getBrokerName(), brokerController.getBrokerAddr());

@@ -27,6 +27,7 @@ import org.apache.rocketmq.client.exception.MQClientException;
 import org.apache.rocketmq.client.impl.MQClientAPIImpl;
 import org.apache.rocketmq.client.impl.MQClientManager;
 import org.apache.rocketmq.client.impl.factory.MQClientInstance;
+import org.apache.rocketmq.common.exporter.ExporterConfig;
 import org.apache.rocketmq.common.namesrv.NamesrvConfig;
 import org.apache.rocketmq.common.protocol.ResponseCode;
 import org.apache.rocketmq.common.protocol.route.BrokerData;
@@ -60,7 +61,7 @@ public class ClusterTestRequestProcessorTest {
     public void init() throws NoSuchFieldException, IllegalAccessException, RemotingException, MQClientException, InterruptedException {
         NamesrvController namesrvController = new NamesrvController(
             new NamesrvConfig(),
-            new NettyServerConfig()
+            new NettyServerConfig(), new ExporterConfig()
         );
 
         clusterTestProcessor = new ClusterTestRequestProcessor(namesrvController, "default-producer");

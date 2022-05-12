@@ -17,21 +17,21 @@
 
 package org.apache.rocketmq.broker;
 
-import java.io.File;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.TimeUnit;
-
 import org.apache.rocketmq.broker.latency.FutureTaskExt;
 import org.apache.rocketmq.common.BrokerConfig;
 import org.apache.rocketmq.common.UtilAll;
+import org.apache.rocketmq.common.exporter.ExporterConfig;
 import org.apache.rocketmq.remoting.netty.NettyClientConfig;
 import org.apache.rocketmq.remoting.netty.NettyServerConfig;
 import org.apache.rocketmq.remoting.netty.RequestTask;
 import org.apache.rocketmq.store.config.MessageStoreConfig;
 import org.junit.After;
-import org.junit.Ignore;
 import org.junit.Test;
+
+import java.io.File;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -40,10 +40,11 @@ public class BrokerControllerTest {
     @Test
     public void testBrokerRestart() throws Exception {
         BrokerController brokerController = new BrokerController(
-            new BrokerConfig(),
-            new NettyServerConfig(),
-            new NettyClientConfig(),
-            new MessageStoreConfig());
+                new BrokerConfig(),
+                new NettyServerConfig(),
+                new NettyClientConfig(),
+                new MessageStoreConfig(),
+                new ExporterConfig());
         assertThat(brokerController.initialize());
         brokerController.start();
         brokerController.shutdown();
@@ -60,7 +61,7 @@ public class BrokerControllerTest {
                 new BrokerConfig(),
                 new NettyServerConfig(),
                 new NettyClientConfig(),
-                new MessageStoreConfig());
+                new MessageStoreConfig(), new ExporterConfig());
         brokerController.initialize();
         BlockingQueue<Runnable> queue = new LinkedBlockingQueue<>();
 
