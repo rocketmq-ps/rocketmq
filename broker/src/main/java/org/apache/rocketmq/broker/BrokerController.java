@@ -144,7 +144,7 @@ public class BrokerController {
     private final BrokerOuterAPI brokerOuterAPI;
     private final ScheduledExecutorService scheduledExecutorService = Executors.newSingleThreadScheduledExecutor(new ThreadFactoryImpl(
             "BrokerControllerScheduledThread"));
-    private final List<ScheduledExecutorService> metricsExcutorServices;
+    private final List<ScheduledExecutorService> metricsExcutorServices = new ArrayList<>();
     private final SlaveSynchronize slaveSynchronize;
     private final BlockingQueue<Runnable> sendThreadPoolQueue;
     private final BlockingQueue<Runnable> putThreadPoolQueue;
@@ -237,7 +237,6 @@ public class BrokerController {
         );
 
         this.exporterController = new ExporterController(exporterConfig, false, log);
-        this.metricsExcutorServices = new ArrayList<>();
     }
 
     public BrokerConfig getBrokerConfig() {
@@ -676,13 +675,17 @@ public class BrokerController {
                     }
                     HashMap<String, Long> brokerOffsetMap = new HashMap<>();
                     HashMap<String, Long> brokerUpdateTimestampMap = new HashMap<>();
+                    HashMap<String, String> exts = new HashMap<>();
 
                     for (String topic : topicList.getTopicList()) {
                         brokerOffsetMap.clear();
                         brokerUpdateTimestampMap.clear();
+                        exts.clear();
 
-                        requestHeader.setTopic(topic);
+                        exts.put("topic", topic);
+
                         RemotingCommand request = RemotingCommand.createRequestCommand(RequestCode.GET_TOPIC_STATS_INFO, requestHeader);
+                        request.setExtFields(exts);
                         try {
                             RemotingCommand response = adminProcessor.processRequest(null, request);
                             // end for success

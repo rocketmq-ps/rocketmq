@@ -52,11 +52,11 @@ public class ExporterController {
 
         this.server = new HTTPServer.Builder()
                 .withHostname(config.getBrokerIP3())
-                .withPort(config.getPort())
+                .withPort(config.getMetricPort())
                 .withRegistry(registry)
                 .build(); //  init and start the server
 
-        log.info("exporter start at %s:%d finished", config.getBrokerIP3(), config.getPort());
+        log.info("exporter start at {}:{} finished", config.getBrokerIP3(), config.getMetricPort());
     }
 
     public void start() {

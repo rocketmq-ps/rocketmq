@@ -26,6 +26,8 @@ import org.apache.rocketmq.exporter.common.MetricConstant;
 import org.apache.rocketmq.logging.InternalLogger;
 import org.apache.rocketmq.logging.InternalLoggerFactory;
 
+import java.util.Locale;
+
 public class BrokerMetricCollector {
     private static InternalLogger log = InternalLoggerFactory.getLogger(LoggerName.EXPORTER_LOGGER_NAME);
     //max offset of topic consume queue
@@ -171,7 +173,7 @@ public class BrokerMetricCollector {
     }
 
     public void addReqResCodeCounter(String clusterName, String nameOfNamesrvOrBroker, String ipAndPort, String requestCode, String responseCode) {
-        this.reqResCodeCounter.incWithExemplar(clusterName, nameOfNamesrvOrBroker, ipAndPort, requestCode, responseCode);
+        this.reqResCodeCounter.labels(clusterName, nameOfNamesrvOrBroker, ipAndPort, requestCode, responseCode).inc();
     }
 
     public void addBrokerRuntimeMetric() {
@@ -179,7 +181,7 @@ public class BrokerMetricCollector {
     }
 
     private void initMetrics(CollectorRegistry registry) {
-        reqResCodeCounter = buildCounterMetric(MQRoleName.BROKER.name(), "req_res_code_counter", new String[]{"cluster", "nodeName", "ipAndPort", "req_code", "res_code"}, "Request and Response Code Counter", registry);
+        reqResCodeCounter = buildCounterMetric(MQRoleName.BROKER.name().toLowerCase(Locale.ROOT), "req_res_code_counter", new String[]{"cluster", "nodeName", "ipAndPort", "req_code", "res_code"}, "Request and Response Code Counter", registry);
 
         topicOffset = buildGaugeMetric("", "", "rocketmq_producer_offset", new String[]{"cluster", "broker", "topic", "lastUpdateTimestamp"}, "topic offset", registry);
         retryTopicOffset = buildGaugeMetric("", "", "rocketmq_topic_retry_offset", new String[]{"cluster", "broker", "group", "lastUpdateTimestamp"}, "retry topic offset", registry);
@@ -214,7 +216,7 @@ public class BrokerMetricCollector {
         brokerRuntimeMsgPutTotalTodayNow = buildGaugeMetric("", "", "rocketmq_brokeruntime_msg_put_total_today_now", new String[]{"cluster", "brokerIP", "brokerHost", "des", "boottime", "broker_version"}, "brokerRuntimeMsgPutTotalTodayNow", registry);
         brokerRuntimeMsgGetTotalTodayNow = buildGaugeMetric("", "", "rocketmq_brokeruntime_msg_gettotal_today_now", new String[]{"cluster", "brokerIP", "brokerHost", "des", "boottime", "broker_version"}, "brokerRuntimeMsgGetTotalTodayNow", registry);
         brokerRuntimeMsgGetTotalYesterdayMorning = buildGaugeMetric("", "", "rocketmq_brokeruntime_msg_gettotal_yesterdaymorning", new String[]{"cluster", "brokerIP", "brokerHost", "des", "boottime", "broker_version"}, "brokerRuntimeMsgGetTotalYesterdayMorning", registry);
-        brokerRuntimeMsgPutTotalYesterdayMorning = buildGaugeMetric("", "", "rocketmq_brokeruntime_msg_gettotal_yesterdaymorning", new String[]{"cluster", "brokerIP", "brokerHost", "des", "boottime", "broker_version"}, "rocketmq_brokeruntime_msg_puttotal_yesterdaymorning", registry);
+        brokerRuntimeMsgPutTotalYesterdayMorning = buildGaugeMetric("", "", "rocketmq_brokeruntime_msg_puttotal_yesterdaymorning", new String[]{"cluster", "brokerIP", "brokerHost", "des", "boottime", "broker_version"}, "rocketmq_brokeruntime_msg_puttotal_yesterdaymorning", registry);
         brokerRuntimeMsgGetTotalTodayMorning = buildGaugeMetric("", "", "rocketmq_brokeruntime_msg_gettotal_todaymorning", new String[]{"cluster", "brokerIP", "brokerHost", "des", "boottime", "broker_version"}, "brokerRuntimeMsgGetTotalTodayMorning", registry);
         brokerRuntimeMsgPutTotalTodayMorning = buildGaugeMetric("", "", "rocketmq_brokeruntime_msg_puttotal_todaymorning", new String[]{"cluster", "brokerIP", "brokerHost", "des", "boottime", "broker_version"}, "brokerRuntimeMsgPutTotalTodayMorning", registry);
         brokerRuntimeDispatchBehindBytes = buildGaugeMetric("", "", "rocketmq_brokeruntime_dispatch_behind_bytes", new String[]{"cluster", "brokerIP", "brokerHost", "des", "boottime", "broker_version"}, "brokerRuntimeDispatchBehindBytes", registry);
@@ -268,7 +270,7 @@ public class BrokerMetricCollector {
         brokerRuntimeQueryThreadPoolQueueHeadWaitTimeMills = buildGaugeMetric("", "", "rocketmq_brokeruntime_query_threadpoolqueue_headwait_timemills", new String[]{"cluster", "brokerIP", "brokerHost", "des", "boottime", "broker_version"}, "brokerRuntimeQueryThreadPoolQueueHeadWaitTimeMills", registry);
         brokerRuntimeSendThreadPoolQueueHeadWaitTimeMills = buildGaugeMetric("", "", "rocketmq_brokeruntime_send_threadpoolqueue_headwait_timemills", new String[]{"cluster", "brokerIP", "brokerHost", "des", "boottime", "broker_version"}, "brokerRuntimeSendThreadPoolQueueHeadWaitTimeMills", registry);
         brokerRuntimeCommitLogDirCapacityFree = buildGaugeMetric("", "", "rocketmq_brokeruntime_commitlogdir_capacity_free", new String[]{"cluster", "brokerIP", "brokerHost", "des", "boottime", "broker_version"}, "brokerRuntimeCommitLogDirCapacityFree", registry);
-        brokerRuntimeCommitLogDirCapacityTotal = buildGaugeMetric("", "", "rocketmq_brokeruntime_commitlogdir_capacity_free", new String[]{"cluster", "brokerIP", "brokerHost", "des", "boottime", "broker_version"}, "brokerRuntimeCommitLogDirCapacityTotal", registry);
+        brokerRuntimeCommitLogDirCapacityTotal = buildGaugeMetric("", "", "rocketmq_brokeruntime_commitlogdir_capacity_total", new String[]{"cluster", "brokerIP", "brokerHost", "des", "boottime", "broker_version"}, "brokerRuntimeCommitLogDirCapacityTotal", registry);
         brokerRuntimeCommitLogMaxOffset = buildGaugeMetric("", "", "rocketmq_brokeruntime_commitlog_maxoffset", new String[]{"cluster", "brokerIP", "brokerHost", "des", "boottime", "broker_version"}, "brokerRuntimeCommitLogMaxOffset", registry);
         brokerRuntimeCommitLogMinOffset = buildGaugeMetric("", "", "rocketmq_brokeruntime_commitlog_minoffset", new String[]{"cluster", "brokerIP", "brokerHost", "des", "boottime", "broker_version"}, "brokerRuntimeCommitLogMinOffset", registry);
         brokerRuntimeRemainHowManyDataToFlush = buildGaugeMetric("", "", "rocketmq_brokeruntime_remain_howmanydata_toflush", new String[]{"cluster", "brokerIP", "brokerHost", "des", "boottime", "broker_version"}, "brokerRuntimeRemainHowManyDataToFlush", registry);

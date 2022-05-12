@@ -25,15 +25,15 @@ import org.apache.rocketmq.remoting.common.RemotingUtil;
 public class ExporterConfig {
     private static final InternalLogger log = InternalLoggerFactory.getLogger(LoggerName.EXPORTER_LOGGER_NAME);
     private String brokerIP3 = RemotingUtil.getLocalAddress();
-    private int port = 15557;
+    private int metricPort = 15557;
     private int outOfTimeSeconds = 60;
 
-    public int getPort() {
-        return port;
+    public int getMetricPort() {
+        return metricPort;
     }
 
-    public void setPort(int port) {
-        this.port = port;
+    public void setMetricPort(int metricPort) {
+        this.metricPort = metricPort;
     }
 
     public String getBrokerIP3() {

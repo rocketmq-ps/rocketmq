@@ -24,6 +24,8 @@ import org.apache.rocketmq.exporter.common.MetricConstant;
 import org.apache.rocketmq.logging.InternalLogger;
 import org.apache.rocketmq.logging.InternalLoggerFactory;
 
+import java.util.Locale;
+
 public class NamesrvMetricCollector {
     private static final InternalLogger log = InternalLoggerFactory.getLogger(LoggerName.EXPORTER_LOGGER_NAME);
     private Counter reqResCodeCounter;
@@ -35,7 +37,7 @@ public class NamesrvMetricCollector {
     private void initMetrics(CollectorRegistry registry) {
         reqResCodeCounter = Counter.build()
                 .namespace(MetricConstant.NAMESPACE)
-                .subsystem(MQRoleName.NAMESRV.name())
+                .subsystem(MQRoleName.NAMESRV.name().toLowerCase(Locale.ROOT))
                 .name("req_res_code_counter")
                 .labelNames("cluster", "nodeName", "ipAndPort", "req_code", "res_code")
                 .help("Request and Response Code Counter")
@@ -45,6 +47,6 @@ public class NamesrvMetricCollector {
     }
 
     public void addReqResCodeCounter(String clusterName, String nameOfNamesrvOrBroker, String ipAndPort, String requestCode, String responseCode) {
-        this.reqResCodeCounter.incWithExemplar(clusterName, nameOfNamesrvOrBroker, ipAndPort, requestCode, responseCode);
+        this.reqResCodeCounter.labels(clusterName, nameOfNamesrvOrBroker, ipAndPort, requestCode, responseCode).inc();
     }
 }
